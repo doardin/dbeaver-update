@@ -1,0 +1,71 @@
+#!/bin/bash
+
+check_dependencies() {
+    if ! command -v jq &> /dev/null; then
+    echo "jq is not installed. Please install jq to proceed."
+    read -p "Do you want to install jq now? (y/n): " choice
+        if [[ "$choice" =~ [Yy] ]]; then
+            echo "Installing jq ..."
+            sudo apt-get install jq
+            echo "jq installed successfully!"
+        else
+            echo "You chose not to install jq."
+            exit 1
+        fi
+    fi
+}
+
+install() {
+    local version="$1"
+    echo "Installing DBeaver $version ..."
+    wget -O latest.deb "https://dbeaver.io/files/dbeaver-ce_latest_amd64.deb"
+    if [ $? -ne 0 ]; then
+        echo "Failed to download the latest version."
+        exit 1
+    fi
+
+    sudo apt install ./latest.deb
+    if [ $? -ne 0 ]; then
+        echo "Failed to install the latest version."
+        rm -f latest.deb
+        exit 1
+    fi
+
+    sudo rm -f latest.deb
+    echo "DBeaver $version installed successfully!"
+}
+
+get_latest_version() {
+    RESPONSE=$(curl -s "https://api.github.com/repos/dbeaver/dbeaver/releases")
+    echo $(echo "$RESPONSE" | jq -r '.[0].tag_name')
+}
+
+update() {
+    LATEST_VERSION=$(get_latest_version)
+    if ! command -v dbeaver &> /dev/null; then
+        echo "DBeaver is not installed."
+        read -p "Do you want to install DBeaver now? (y/n): " choice
+        if [[ "$choice" =~ [Yy] ]]; then
+            install $LATEST_VERSION
+            exit 1
+        else
+            echo "You chose not to install DBeaver."
+        fi
+        exit 1
+    fi
+
+    CURRENT_VERSION=$(dbeaver --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+
+    if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+        echo "DBeaver is already up to date (version $CURRENT_VERSION)."
+    else
+        install $LATEST_VERSION
+    fi
+}
+
+main() {
+    check_dependencies
+    update
+}
+
+main
